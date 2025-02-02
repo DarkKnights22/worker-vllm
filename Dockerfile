@@ -1,19 +1,26 @@
 FROM nvidia/cuda:12.1.0-base-ubuntu22.04 
 
+# Update and install Python3-pip
 RUN apt-get update -y \
     && apt-get install -y python3-pip
 
 RUN ldconfig /usr/local/cuda-12.1/compat/
 
-# Install Python dependencies
+# Install Python dependencies from requirements.txt
 COPY builder/requirements.txt /requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     python3 -m pip install --upgrade pip && \
     python3 -m pip install --upgrade -r /requirements.txt
 
-# Install vLLM (switching back to pip installs since issues that required building fork are fixed and space optimization is not as important since caching) and FlashInfer 
+# Install vLLM and FlashInfer (your current setup)
 RUN python3 -m pip install vllm==0.7.0 && \
     python3 -m pip install flashinfer -i https://flashinfer.ai/whl/cu121/torch2.3
+
+# -----------------------------------------
+# Additional Inference Optimization Libraries
+# These do not conflict with your current setup and provide options for efficient serving:
+RUN python3 -m pip install deepspeed accelerate onnx onnxruntime
+# -----------------------------------------
 
 # Setup for Option 2: Building the Image with the Model included
 ARG MODEL_NAME=""
@@ -36,14 +43,14 @@ ENV MODEL_NAME=$MODEL_NAME \
 
 ENV PYTHONPATH="/:/vllm-workspace"
 
-
+# Copy source code and conditionally download the model
 COPY src /src
 RUN --mount=type=secret,id=HF_TOKEN,required=false \
     if [ -f /run/secrets/HF_TOKEN ]; then \
-    export HF_TOKEN=$(cat /run/secrets/HF_TOKEN); \
+      export HF_TOKEN=$(cat /run/secrets/HF_TOKEN); \
     fi && \
     if [ -n "$MODEL_NAME" ]; then \
-    python3 /src/download_model.py; \
+      python3 /src/download_model.py; \
     fi
 
 # Start the handler
