@@ -151,7 +151,9 @@ def get_engine_args():
     # Set tensor parallel size and max parallel loading workers if more than 1 GPU is available
     num_gpus = device_count()
     if num_gpus > 1:
-        args["tensor_parallel_size"] = num_gpus
+        if not os.getenv("TENSOR_PARALLEL_SIZE"):
+            args["tensor_parallel_size"] = num_gpus
+            
         args["max_parallel_loading_workers"] = None
         if os.getenv("MAX_PARALLEL_LOADING_WORKERS"):
             logging.warning("Overriding MAX_PARALLEL_LOADING_WORKERS with None because more than 1 GPU is available.")
